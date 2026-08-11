@@ -2,7 +2,7 @@ fastapi
 uvicorn
 motor
 python-dotenv
-pydantic
+pydantic[email]
 python-jose
 passlib[bcrypt]
 python-multipart
