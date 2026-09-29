@@ -63,6 +63,7 @@
         setToken(data.access_token);
         const me = await apiFetch("/auth/me");
         setRole(me.role);
+        setName(me.name);
         window.location.href = "index.html";
       } catch (err) {
         showAlert("alert-container", `Login failed: ${err.message}`);

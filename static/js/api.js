@@ -26,6 +26,18 @@ function clearRole() {
   localStorage.removeItem("role");
 }
 
+function getName() {
+  return localStorage.getItem("name");
+}
+
+function setName(name) {
+  localStorage.setItem("name", name);
+}
+
+function clearName() {
+  localStorage.removeItem("name");
+}
+
 function isLoggedIn() {
   return !!getToken();
 }
@@ -37,6 +49,7 @@ function isAdmin() {
 function logout() {
   clearToken();
   clearRole();
+  clearName();
   window.location.href = "index.html";
 }
 
@@ -94,11 +107,30 @@ function renderAuthNav() {
     const adminLink = isAdmin()
       ? `<a class="nav-link" href="admin.html">Admin</a>`
       : "";
-    authNav.innerHTML = `${adminLink}<a class="nav-link" href="#" id="logout-link">Logout</a>`;
+    authNav.innerHTML = `
+      <span class="navbar-text me-3" id="user-name"></span>
+      ${adminLink}<a class="nav-link" href="#" id="logout-link">Logout</a>
+    `;
     document.getElementById("logout-link").addEventListener("click", (e) => {
       e.preventDefault();
       logout();
     });
+
+    const nameEl = document.getElementById("user-name");
+    const showName = (name) => {
+      nameEl.textContent = name ? `Hello, ${name}` : "";
+    };
+    if (getName()) {
+      showName(getName());
+    } else {
+      // Session predates name storage; fetch it once.
+      apiFetch("/auth/me")
+        .then((me) => {
+          setName(me.name);
+          showName(me.name);
+        })
+        .catch(() => {});
+    }
   } else {
     authNav.innerHTML = `
       <a class="nav-link" href="login.html">Login</a>
