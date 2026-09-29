@@ -4,7 +4,7 @@ from fastapi import FastAPI
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
-from app.routes import auth, cart, orders, products
+from app.routes import auth, cart, orders, products, users
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
@@ -14,6 +14,7 @@ app.include_router(auth.router)
 app.include_router(products.router)
 app.include_router(cart.router)
 app.include_router(orders.router)
+app.include_router(users.router)
 
 app.mount("/static", StaticFiles(directory=BASE_DIR / "static"), name="static")
 

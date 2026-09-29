@@ -1,5 +1,6 @@
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status
 
+from app.auth.dependencies import get_current_user
 from app.auth.utils import create_access_token, hash_password, verify_password
 from app.database import db
 from app.models.user import UserCreate, UserLogin, UserOut
@@ -45,3 +46,14 @@ async def login(credentials: UserLogin):
 
     access_token = create_access_token(data={"sub": str(user["_id"])})
     return {"access_token": access_token, "token_type": "bearer"}
+
+
+@router.get("/me", response_model=UserOut)
+async def get_me(current_user: dict = Depends(get_current_user)):
+    """Return the currently logged-in user's info."""
+    return UserOut(
+        id=str(current_user["_id"]),
+        name=current_user["name"],
+        email=current_user["email"],
+        role=current_user.get("role", "user"),
+    )

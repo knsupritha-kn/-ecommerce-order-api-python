@@ -1,0 +1,351 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Admin Dashboard - E-commerce Order Management</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="/static/css/style.css" rel="stylesheet">
+</head>
+<body>
+  <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
+    <div class="container">
+      <a class="navbar-brand" href="index.html">E-Shop</a>
+      <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+        <span class="navbar-toggler-icon"></span>
+      </button>
+      <div class="collapse navbar-collapse" id="navbarNav">
+        <ul class="navbar-nav me-auto">
+          <li class="nav-item"><a class="nav-link" href="index.html">Home</a></li>
+          <li class="nav-item"><a class="nav-link" href="cart.html">Cart</a></li>
+          <li class="nav-item"><a class="nav-link" href="orders.html">My Orders</a></li>
+        </ul>
+        <ul class="navbar-nav" id="auth-nav"></ul>
+      </div>
+    </div>
+  </nav>
+
+  <div class="container mt-4">
+    <h2 class="mb-4">Admin Dashboard</h2>
+    <div id="alert-container"></div>
+
+    <ul class="nav nav-tabs mb-4" id="admin-tabs" role="tablist">
+      <li class="nav-item" role="presentation">
+        <button class="nav-link active" id="products-tab" data-bs-toggle="tab" data-bs-target="#products-pane" type="button" role="tab" aria-controls="products-pane" aria-selected="true">Products</button>
+      </li>
+      <li class="nav-item" role="presentation">
+        <button class="nav-link" id="orders-tab" data-bs-toggle="tab" data-bs-target="#orders-pane" type="button" role="tab" aria-controls="orders-pane" aria-selected="false">Orders</button>
+      </li>
+    </ul>
+
+    <div class="tab-content" id="admin-tabs-content">
+    <div class="tab-pane fade show active" id="products-pane" role="tabpanel" aria-labelledby="products-tab">
+
+    <div class="card mb-4">
+      <div class="card-body">
+        <h5 class="card-title mb-3" id="product-form-title">Add Product</h5>
+        <form id="product-form">
+          <input type="hidden" id="product-id">
+          <div class="row g-3">
+            <div class="col-md-6">
+              <label for="product-name" class="form-label">Name</label>
+              <input type="text" class="form-control" id="product-name" required>
+            </div>
+            <div class="col-md-6">
+              <label for="product-category" class="form-label">Category</label>
+              <input type="text" class="form-control" id="product-category" required>
+            </div>
+            <div class="col-md-12">
+              <label for="product-description" class="form-label">Description</label>
+              <textarea class="form-control" id="product-description" rows="2"></textarea>
+            </div>
+            <div class="col-md-6">
+              <label for="product-price" class="form-label">Price</label>
+              <input type="number" class="form-control" id="product-price" step="0.01" min="0" required>
+            </div>
+            <div class="col-md-6">
+              <label for="product-stock" class="form-label">Stock</label>
+              <input type="number" class="form-control" id="product-stock" min="0" required>
+            </div>
+          </div>
+          <div class="mt-3">
+            <button type="submit" class="btn btn-primary" id="product-form-submit">Add Product</button>
+            <button type="button" class="btn btn-secondary d-none" id="product-form-cancel">Cancel</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <h5 class="mb-3">Products</h5>
+    <div class="table-responsive">
+      <table class="table bg-white align-middle">
+        <thead>
+          <tr>
+            <th>Name</th>
+            <th>Price</th>
+            <th>Stock</th>
+            <th>Category</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody id="products-table-body"></tbody>
+      </table>
+    </div>
+
+    </div>
+    <div class="tab-pane fade" id="orders-pane" role="tabpanel" aria-labelledby="orders-tab">
+
+    <h5 class="mb-3">Orders</h5>
+    <div class="table-responsive">
+      <table class="table bg-white align-middle">
+        <thead>
+          <tr>
+            <th>Customer</th>
+            <th>Items</th>
+            <th>Total</th>
+            <th>Status</th>
+            <th>Created At</th>
+            <th>Change Status</th>
+          </tr>
+        </thead>
+        <tbody id="orders-table-body"></tbody>
+      </table>
+    </div>
+
+    </div>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+  <script src="/static/js/api.js"></script>
+  <script>
+    if (!isAdmin()) {
+      window.location.href = "index.html";
+    }
+
+    let products = [];
+
+    const form = document.getElementById("product-form");
+    const formTitle = document.getElementById("product-form-title");
+    const formSubmit = document.getElementById("product-form-submit");
+    const formCancel = document.getElementById("product-form-cancel");
+    const idField = document.getElementById("product-id");
+    const nameField = document.getElementById("product-name");
+    const categoryField = document.getElementById("product-category");
+    const descriptionField = document.getElementById("product-description");
+    const priceField = document.getElementById("product-price");
+    const stockField = document.getElementById("product-stock");
+
+    function resetForm() {
+      form.reset();
+      idField.value = "";
+      formTitle.textContent = "Add Product";
+      formSubmit.textContent = "Add Product";
+      formCancel.classList.add("d-none");
+    }
+
+    function fillForm(product) {
+      idField.value = product.id;
+      nameField.value = product.name;
+      categoryField.value = product.category;
+      descriptionField.value = product.description || "";
+      priceField.value = product.price;
+      stockField.value = product.stock;
+      formTitle.textContent = "Edit Product";
+      formSubmit.textContent = "Save Changes";
+      formCancel.classList.remove("d-none");
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    }
+
+    async function loadProducts() {
+      const tbody = document.getElementById("products-table-body");
+      try {
+        products = await apiFetch("/products");
+        if (!products.length) {
+          tbody.innerHTML = `<tr><td colspan="5" class="text-muted">No products available.</td></tr>`;
+          return;
+        }
+        tbody.innerHTML = products.map((p) => `
+          <tr>
+            <td>${p.name}</td>
+            <td>$${p.price.toFixed(2)}</td>
+            <td>${p.stock}</td>
+            <td>${p.category}</td>
+            <td>
+              <button class="btn btn-sm btn-outline-secondary edit-btn" data-product-id="${p.id}">Edit</button>
+              <button class="btn btn-sm btn-outline-danger delete-btn" data-product-id="${p.id}">Delete</button>
+            </td>
+          </tr>
+        `).join("");
+
+        document.querySelectorAll(".edit-btn").forEach((btn) => {
+          btn.addEventListener("click", () => {
+            const product = products.find((p) => p.id === btn.dataset.productId);
+            if (product) fillForm(product);
+          });
+        });
+        document.querySelectorAll(".delete-btn").forEach((btn) => {
+          btn.addEventListener("click", () => deleteProduct(btn.dataset.productId));
+        });
+      } catch (err) {
+        showAlert("alert-container", `Failed to load products: ${err.message}`);
+      }
+    }
+
+    async function deleteProduct(productId) {
+      if (!confirm("Delete this product?")) return;
+      try {
+        await apiFetch(`/products/${productId}`, { method: "DELETE" });
+        showAlert("alert-container", "Product deleted.", "success");
+        loadProducts();
+      } catch (err) {
+        showAlert("alert-container", `Failed to delete product: ${err.message}`);
+      }
+    }
+
+    form.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const payload = {
+        name: nameField.value,
+        description: descriptionField.value,
+        price: parseFloat(priceField.value),
+        stock: parseInt(stockField.value, 10),
+        category: categoryField.value,
+      };
+
+      try {
+        if (idField.value) {
+          await apiFetch(`/products/${idField.value}`, {
+            method: "PUT",
+            body: JSON.stringify(payload),
+          });
+          showAlert("alert-container", "Product updated.", "success");
+        } else {
+          await apiFetch("/products", {
+            method: "POST",
+            body: JSON.stringify(payload),
+          });
+          showAlert("alert-container", "Product added.", "success");
+        }
+        resetForm();
+        loadProducts();
+      } catch (err) {
+        showAlert("alert-container", `Failed to save product: ${err.message}`);
+      }
+    });
+
+    formCancel.addEventListener("click", resetForm);
+
+    loadProducts();
+
+    const ORDER_STATUSES = ["pending", "shipped", "delivered", "cancelled"];
+
+    function statusBadgeClass(status) {
+      switch (status) {
+        case "pending": return "bg-warning text-dark";
+        case "shipped": return "bg-info text-dark";
+        case "delivered": return "bg-success";
+        case "cancelled": return "bg-danger";
+        default: return "bg-secondary";
+      }
+    }
+
+    let userMap = {};
+    let orderProductMap = {};
+
+    async function loadUsers() {
+      try {
+        const users = await apiFetch("/users");
+        userMap = Object.fromEntries(users.map((u) => [u.id, u]));
+      } catch (err) {
+        userMap = {};
+      }
+    }
+
+    async function loadOrderProducts() {
+      try {
+        const products = await apiFetch("/products");
+        orderProductMap = Object.fromEntries(products.map((p) => [p.id, p.name]));
+      } catch (err) {
+        orderProductMap = {};
+      }
+    }
+
+    function customerLabel(userId) {
+      const user = userMap[userId];
+      return user ? (user.name || user.email) : userId;
+    }
+
+    async function loadOrders() {
+      const tbody = document.getElementById("orders-table-body");
+      try {
+        await Promise.all([loadUsers(), loadOrderProducts()]);
+        const orders = await apiFetch("/orders/admin/all");
+        if (!orders.length) {
+          tbody.innerHTML = `<tr><td colspan="6" class="text-muted">No orders found.</td></tr>`;
+          return;
+        }
+        tbody.innerHTML = orders.map((o) => `
+          <tr class="order-row" data-order-id="${o.id}" style="cursor: pointer;">
+            <td>${customerLabel(o.user_id)}</td>
+            <td>${o.items.length}</td>
+            <td>$${o.total.toFixed(2)}</td>
+            <td><span class="badge ${statusBadgeClass(o.status)}">${o.status}</span></td>
+            <td>${new Date(o.created_at).toLocaleString()}</td>
+            <td>
+              <select class="form-select form-select-sm status-select" data-order-id="${o.id}" style="width: auto; display: inline-block;">
+                ${ORDER_STATUSES.map((s) => `<option value="${s}" ${s === o.status ? "selected" : ""}>${s}</option>`).join("")}
+              </select>
+            </td>
+          </tr>
+          <tr class="order-detail-row d-none" data-order-detail-id="${o.id}">
+            <td colspan="6">
+              <ul class="list-group list-group-flush">
+                ${o.items.map((item) => `
+                  <li class="list-group-item d-flex justify-content-between">
+                    <span>${orderProductMap[item.product_id] || item.product_id}</span>
+                    <span>Qty: ${item.quantity}</span>
+                  </li>
+                `).join("")}
+              </ul>
+            </td>
+          </tr>
+        `).join("");
+
+        document.querySelectorAll(".status-select").forEach((select) => {
+          select.addEventListener("change", (e) => {
+            e.stopPropagation();
+            updateOrderStatus(select.dataset.orderId, select.value);
+          });
+          select.addEventListener("click", (e) => e.stopPropagation());
+        });
+
+        document.querySelectorAll(".order-row").forEach((row) => {
+          row.addEventListener("click", () => {
+            const detail = document.querySelector(`[data-order-detail-id="${row.dataset.orderId}"]`);
+            if (detail) detail.classList.toggle("d-none");
+          });
+        });
+      } catch (err) {
+        showAlert("alert-container", `Failed to load orders: ${err.message}`);
+      }
+    }
+
+    async function updateOrderStatus(orderId, newStatus) {
+      try {
+        await apiFetch(`/orders/${orderId}/status`, {
+          method: "PUT",
+          body: JSON.stringify({ status: newStatus }),
+        });
+        showAlert("alert-container", "Order status updated.", "success");
+        loadOrders();
+      } catch (err) {
+        showAlert("alert-container", `Failed to update order status: ${err.message}`);
+        loadOrders();
+      }
+    }
+
+    document.getElementById("orders-tab").addEventListener("shown.bs.tab", loadOrders, { once: true });
+  </script>
+</body>
+</html>

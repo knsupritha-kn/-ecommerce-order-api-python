@@ -61,6 +61,8 @@
           body: JSON.stringify({ email, password }),
         });
         setToken(data.access_token);
+        const me = await apiFetch("/auth/me");
+        setRole(me.role);
         window.location.href = "index.html";
       } catch (err) {
         showAlert("alert-container", `Login failed: ${err.message}`);

@@ -14,12 +14,29 @@ function clearToken() {
   localStorage.removeItem("token");
 }
 
+function getRole() {
+  return localStorage.getItem("role");
+}
+
+function setRole(role) {
+  localStorage.setItem("role", role);
+}
+
+function clearRole() {
+  localStorage.removeItem("role");
+}
+
 function isLoggedIn() {
   return !!getToken();
 }
 
+function isAdmin() {
+  return isLoggedIn() && getRole() === "admin";
+}
+
 function logout() {
   clearToken();
+  clearRole();
   window.location.href = "index.html";
 }
 
@@ -68,7 +85,10 @@ function renderAuthNav() {
   if (!authNav) return;
 
   if (isLoggedIn()) {
-    authNav.innerHTML = `<a class="nav-link" href="#" id="logout-link">Logout</a>`;
+    const adminLink = isAdmin()
+      ? `<a class="nav-link" href="admin.html">Admin</a>`
+      : "";
+    authNav.innerHTML = `${adminLink}<a class="nav-link" href="#" id="logout-link">Logout</a>`;
     document.getElementById("logout-link").addEventListener("click", (e) => {
       e.preventDefault();
       logout();
