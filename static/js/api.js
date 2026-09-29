@@ -84,6 +84,12 @@ function renderAuthNav() {
   const authNav = document.getElementById("auth-nav");
   if (!authNav) return;
 
+  if (isAdmin()) {
+    document
+      .querySelectorAll('a[href="cart.html"], a[href="orders.html"]')
+      .forEach(link => (link.closest("li") || link).remove());
+  }
+
   if (isLoggedIn()) {
     const adminLink = isAdmin()
       ? `<a class="nav-link" href="admin.html">Admin</a>`
