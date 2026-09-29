@@ -23,11 +23,11 @@ A full-stack e-commerce application with user shopping flow and an admin dashboa
 ### User
 | Home | Cart |
 |---|---|
-| ![](screenshots/user-home.png) | ![](screenshots/user-cart.png) |
+| ![](Screenshots/user-home.png) | ![](Screenshots/user-cart.png) |
 | **My Orders** | **Login** |
-| ![](screenshots/user-orders.png) | ![](screenshots/user-login.png) |
+| ![](Screenshots/user-orders.png) | ![](Screenshots/user-login.png) |
 
    ### Admin
    | Products | Orders |
    |---|---|
-   | ![](screenshots/admin-products.png) | ![](screenshots/admin-orders.png) |
+   | ![](Screenshots/admin-products.png) | [](Screenshots/admin-orders.png) |
