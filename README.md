@@ -1,3 +1,5 @@
+[![CI](https://github.com/knsupritha-kn/-ecommerce-order-api-python/actions/workflows/ci.yml/badge.svg)](https://github.com/knsupritha-kn/-ecommerce-order-api-python/actions/workflows/ci.yml)
+
 # E-commerce Order Management System
 
 A full-stack e-commerce application with user shopping flow and an admin dashboard.

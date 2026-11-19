@@ -19,6 +19,6 @@ async def test_connection() -> bool:
         await client.admin.command("ping")
         print("MongoDB connection successful.")
         return True
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001 - any failure means "not connected"
         print(f"MongoDB connection failed: {exc}")
         return False

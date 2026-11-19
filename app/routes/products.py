@@ -1,4 +1,3 @@
-from typing import Optional
 
 from bson import ObjectId
 from bson.errors import InvalidId
@@ -37,7 +36,7 @@ async def get_product_or_404(product_id: str) -> dict:
 
 
 @router.get("", response_model=list[ProductOut])
-async def list_products(category: Optional[str] = None, search: Optional[str] = None):
+async def list_products(category: str | None = None, search: str | None = None):
     """List products, optionally filtered by category and/or name search."""
     query = {}
     if category:
