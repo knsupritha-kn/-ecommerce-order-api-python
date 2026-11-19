@@ -103,11 +103,21 @@ async def create_order(order: OrderCreate, current_user: dict = Depends(get_curr
         products[item["product_id"]] = product
         total += product["price"] * item["quantity"]
 
+    # Atomically reserve stock per item; the filter prevents overselling under concurrency.
+    reduced = []
     for item in items:
-        await db.products.update_one(
-            {"_id": ObjectId(item["product_id"])},
-            {"$inc": {"stock": -item["quantity"]}},
+        pid = ObjectId(item["product_id"])
+        qty = item["quantity"]
+        result = await db.products.update_one(
+            {"_id": pid, "stock": {"$gte": qty}},
+            {"$inc": {"stock": -qty}},
         )
+        if result.modified_count == 0:
+            # Roll back stock for items already reduced.
+            for done_pid, done_qty in reduced:
+                await db.products.update_one({"_id": done_pid}, {"$inc": {"stock": done_qty}})
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Not enough stock")
+        reduced.append((pid, qty))
 
     created_at = datetime.now(timezone.utc)
     order_doc = {

@@ -1,12 +1,9 @@
-import os
-
-from dotenv import load_dotenv
 from motor.motor_asyncio import AsyncIOMotorClient
 
-# Load environment variables from a .env file into the process environment
-load_dotenv()
+from app.config import require_env
 
-MONGO_URI = os.getenv("MONGO_URI")
+# Raises a clear error at startup if MONGO_URI is not set
+MONGO_URI = require_env("MONGO_URI")
 
 # Create a single async MongoDB client for the app to reuse
 client = AsyncIOMotorClient(MONGO_URI)

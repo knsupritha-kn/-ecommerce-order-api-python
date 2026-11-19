@@ -2,12 +2,12 @@ import os
 from datetime import datetime, timedelta, timezone
 
 import bcrypt
-from dotenv import load_dotenv
 from jose import JWTError, jwt
 
-load_dotenv()
+from app.config import require_env
 
-SECRET_KEY = os.getenv("SECRET_KEY")
+# Raises a clear error at startup if SECRET_KEY is not set
+SECRET_KEY = require_env("SECRET_KEY")
 ALGORITHM = os.getenv("ALGORITHM", "HS256")
 ACCESS_TOKEN_EXPIRE_MINUTES = 60
 

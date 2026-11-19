@@ -27,7 +27,7 @@ A full-stack e-commerce application with user shopping flow and an admin dashboa
 | **My Orders** | **Login** |
 | ![](Screenshots/user-orders.png) | ![](Screenshots/user-login.png) |
 
-   ### Admin
-   | Products | Orders |
-   |---|---|
-   | ![](Screenshots/admin-products.png) | [](Screenshots/admin-orders.png) |
+### Admin
+| Products | Orders |
+|---|---|
+| ![](Screenshots/admin-products.png) | ![](Screenshots/admin-orders.png) |
