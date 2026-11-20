@@ -1,8 +1,12 @@
 """Thin async client for a local Ollama server."""
 
+import logging
+
 import httpx
 
 from app import config
+
+logger = logging.getLogger(__name__)
 
 
 class AIUnavailableError(Exception):
@@ -16,6 +20,7 @@ async def _request(method: str, path: str, *, timeout: float, json: dict | None 
             response.raise_for_status()
             return response.json()
     except (httpx.HTTPError, ValueError) as exc:
+        logger.warning("Ollama call failed: %s %s -> %s", method, path, exc.__class__.__name__)
         raise AIUnavailableError(str(exc) or exc.__class__.__name__) from exc
 
 
@@ -30,6 +35,7 @@ async def chat(messages: list[dict]) -> str:
     try:
         return data["message"]["content"]
     except (KeyError, TypeError) as exc:
+        logger.warning("Ollama /api/chat returned an unexpected payload")
         raise AIUnavailableError("Unexpected response from Ollama /api/chat") from exc
 
 
@@ -44,6 +50,7 @@ async def embed(text: str) -> list[float]:
     try:
         return data["embeddings"][0]
     except (KeyError, IndexError, TypeError) as exc:
+        logger.warning("Ollama /api/embed returned an unexpected payload")
         raise AIUnavailableError("Unexpected response from Ollama /api/embed") from exc
 
 

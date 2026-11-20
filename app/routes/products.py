@@ -8,6 +8,7 @@ from app.ai.embeddings import VECTOR_INDEX, cosine, embed_product
 from app.auth.dependencies import get_current_admin
 from app.database import db
 from app.models.product import ProductCreate, ProductOut
+from app.pagination import Pagination, pagination
 
 router = APIRouter(prefix="/products", tags=["products"])
 
@@ -38,15 +39,25 @@ async def get_product_or_404(product_id: str) -> dict:
 
 
 @router.get("", response_model=list[ProductOut])
-async def list_products(category: str | None = None, search: str | None = None):
-    """List products, optionally filtered by category and/or name search."""
+async def list_products(
+    category: str | None = None,
+    search: str | None = None,
+    page: Pagination = Depends(pagination),
+):
+    """List products (paginated), optionally filtered by category and/or name search."""
     query = {}
     if category:
         query["category"] = category
     if search:
         query["name"] = {"$regex": search, "$options": "i"}
 
-    products = await db.products.find(query).to_list(length=None)
+    products = (
+        await db.products.find(query)
+        .sort("_id", 1)
+        .skip(page.skip)
+        .limit(page.limit)
+        .to_list(length=None)
+    )
     return [product_to_out(p) for p in products]
 
 

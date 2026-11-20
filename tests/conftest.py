@@ -6,10 +6,11 @@ os.environ["SECRET_KEY"] = "test-secret-key"
 os.environ["MONGO_URI"] = "mongodb://localhost:27017"
 
 import httpx
+import pytest
 import pytest_asyncio
 from mongomock_motor import AsyncMongoMockClient
 
-from app import database
+from app import database, ratelimit
 from app.auth import dependencies as auth_dependencies
 from app.main import app
 from app.routes import ai, auth, cart, orders, products, users
@@ -17,6 +18,12 @@ from app.routes import ai, auth, cart, orders, products, users
 # Every module that does `from app.database import db` holds its own reference,
 # so each one has to be patched.
 MODULES_USING_DB = [database, auth_dependencies, ai, auth, cart, orders, products, users]
+
+
+@pytest.fixture(autouse=True)
+def _reset_rate_limiter():
+    """The limiter is in-memory and global; start every test with a clean slate."""
+    ratelimit.reset()
 
 
 @pytest_asyncio.fixture

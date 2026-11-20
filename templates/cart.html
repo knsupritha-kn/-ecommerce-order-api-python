@@ -65,7 +65,7 @@
 
     async function loadProducts() {
       try {
-        const products = await apiFetch("/products");
+        const products = await apiFetch("/products?limit=100");
         productMap = Object.fromEntries(products.map((p) => [p.id, p.name]));
       } catch (err) {
         productMap = {};

@@ -9,6 +9,7 @@ from app.ai import llm
 from app.ai.embeddings import embed_product
 from app.auth.dependencies import get_current_admin, get_current_user
 from app.database import db
+from app.ratelimit import ai_rate_limit
 
 router = APIRouter(prefix="/ai", tags=["ai"])
 
@@ -20,6 +21,24 @@ SYSTEM_PROMPT = (
     "Be brief. If the answer isn't in the data, say so.\n\n"
     "Order data:\n{context}"
 )
+
+
+DESCRIBE_PROMPT = (
+    "You write product descriptions for an online shop. Write a short, appealing "
+    "description of 2-3 sentences. Use only the details provided. Do not invent "
+    "specifications, materials, features, prices, or claims. Reply with the "
+    "description text only."
+)
+
+
+class DescribeRequest(BaseModel):
+    name: str = Field(min_length=1, max_length=200)
+    category: str = Field(min_length=1, max_length=100)
+    keywords: str | None = Field(default=None, max_length=500)
+
+
+class DescribeResponse(BaseModel):
+    description: str
 
 
 class ChatRequest(BaseModel):
@@ -65,7 +84,7 @@ async def ai_health():
     }
 
 
-@router.post("/products/reindex")
+@router.post("/products/reindex", dependencies=[Depends(ai_rate_limit)])
 async def reindex_products(admin: dict = Depends(get_current_admin)):
     """(Re)generate embeddings for every product (admin only)."""
     indexed = 0
@@ -124,7 +143,7 @@ async def describe_orders(orders: list[dict]) -> str:
     return "\n".join(blocks)
 
 
-@router.post("/chat", response_model=ChatResponse)
+@router.post("/chat", response_model=ChatResponse, dependencies=[Depends(ai_rate_limit)])
 async def chat(body: ChatRequest, current_user: dict = Depends(get_current_user)):
     """Answer questions about the logged-in user's own orders."""
     orders = await load_order_context(str(current_user["_id"]), body.message)
@@ -144,3 +163,23 @@ async def chat(body: ChatRequest, current_user: dict = Depends(get_current_user)
     except llm.AIUnavailableError:
         raise ai_unavailable()
     return ChatResponse(reply=reply, orders_used=[str(o["_id"]) for o in orders])
+
+
+@router.post(
+    "/products/describe", response_model=DescribeResponse, dependencies=[Depends(ai_rate_limit)]
+)
+async def describe_product(body: DescribeRequest, admin: dict = Depends(get_current_admin)):
+    """Draft a product description with the LLM (admin only); the admin edits before saving."""
+    details = f"Product name: {body.name}\nCategory: {body.category}"
+    if body.keywords and body.keywords.strip():
+        details += f"\nKeywords: {body.keywords.strip()}"
+    try:
+        text = await llm.chat(
+            [
+                {"role": "system", "content": DESCRIBE_PROMPT},
+                {"role": "user", "content": details},
+            ]
+        )
+    except llm.AIUnavailableError:
+        raise ai_unavailable()
+    return DescribeResponse(description=text.strip())

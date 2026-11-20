@@ -42,7 +42,7 @@
     async function loadProducts(query) {
       const container = document.getElementById("products-container");
       try {
-        const path = query ? `/products/search?q=${encodeURIComponent(query)}&limit=5` : "/products";
+        const path = query ? `/products/search?q=${encodeURIComponent(query)}&limit=5` : "/products?limit=100";
         const products = await apiFetch(path);
         if (!products.length) {
           container.innerHTML = `<p class="text-muted">${query ? "No matching products." : "No products available."}</p>`;

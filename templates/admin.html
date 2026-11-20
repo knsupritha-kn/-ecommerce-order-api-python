@@ -56,7 +56,10 @@
               <input type="text" class="form-control" id="product-category" required>
             </div>
             <div class="col-md-12">
-              <label for="product-description" class="form-label">Description</label>
+              <div class="d-flex justify-content-between align-items-end mb-1">
+                <label for="product-description" class="form-label mb-0">Description</label>
+                <button type="button" class="btn btn-sm btn-outline-secondary" id="generate-description-btn">Generate with AI</button>
+              </div>
               <textarea class="form-control" id="product-description" rows="2"></textarea>
             </div>
             <div class="col-md-6">
@@ -134,6 +137,34 @@
     const categoryField = document.getElementById("product-category");
     const descriptionField = document.getElementById("product-description");
     const priceField = document.getElementById("product-price");
+    const generateBtn = document.getElementById("generate-description-btn");
+
+    // Fills the description box with an AI draft; the admin can edit before saving.
+    // Any text already in the box is sent as keywords to steer the draft.
+    generateBtn.addEventListener("click", async () => {
+      if (!nameField.value.trim() || !categoryField.value.trim()) {
+        showAlert("alert-container", "Enter a name and category first.");
+        return;
+      }
+      generateBtn.disabled = true;
+      generateBtn.textContent = "Generating...";
+      try {
+        const data = await apiFetch("/ai/products/describe", {
+          method: "POST",
+          body: JSON.stringify({
+            name: nameField.value.trim(),
+            category: categoryField.value.trim(),
+            keywords: descriptionField.value.trim() || null,
+          }),
+        });
+        descriptionField.value = data.description;
+      } catch (err) {
+        showAlert("alert-container", `Could not generate description: ${err.message}`);
+      } finally {
+        generateBtn.disabled = false;
+        generateBtn.textContent = "Generate with AI";
+      }
+    });
     const stockField = document.getElementById("product-stock");
 
     function resetForm() {
@@ -160,7 +191,7 @@
     async function loadProducts() {
       const tbody = document.getElementById("products-table-body");
       try {
-        products = await apiFetch("/products");
+        products = await apiFetch("/products?limit=100");
         if (!products.length) {
           tbody.innerHTML = `<tr><td colspan="5" class="text-muted">No products available.</td></tr>`;
           return;
@@ -264,7 +295,7 @@
 
     async function loadOrderProducts() {
       try {
-        const products = await apiFetch("/products");
+        const products = await apiFetch("/products?limit=100");
         orderProductMap = Object.fromEntries(products.map((p) => [p.id, p.name]));
       } catch (err) {
         orderProductMap = {};
@@ -280,7 +311,7 @@
       const tbody = document.getElementById("orders-table-body");
       try {
         await Promise.all([loadUsers(), loadOrderProducts()]);
-        const orders = await apiFetch("/orders/admin/all");
+        const orders = await apiFetch("/orders/admin/all?limit=100");
         if (!orders.length) {
           tbody.innerHTML = `<tr><td colspan="6" class="text-muted">No orders found.</td></tr>`;
           return;
