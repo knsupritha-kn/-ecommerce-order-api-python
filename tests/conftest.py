@@ -12,11 +12,11 @@ from mongomock_motor import AsyncMongoMockClient
 from app import database
 from app.auth import dependencies as auth_dependencies
 from app.main import app
-from app.routes import auth, cart, orders, products, users
+from app.routes import ai, auth, cart, orders, products, users
 
 # Every module that does `from app.database import db` holds its own reference,
 # so each one has to be patched.
-MODULES_USING_DB = [database, auth_dependencies, auth, cart, orders, products, users]
+MODULES_USING_DB = [database, auth_dependencies, ai, auth, cart, orders, products, users]
 
 
 @pytest_asyncio.fixture

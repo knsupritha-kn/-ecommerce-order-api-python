@@ -6,3 +6,4 @@ pydantic[email]==2.14.4
 python-jose==3.5.0
 bcrypt==5.0.0
 python-multipart==0.0.34
+httpx==0.28.1

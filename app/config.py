@@ -14,3 +14,9 @@ def require_env(name: str) -> str:
             f"Set it in your .env file (see .env.example) or the process environment."
         )
     return value
+
+
+# --- Optional AI settings (local Ollama). The app runs fine without them. ---
+OLLAMA_BASE_URL = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434").strip().rstrip("/")
+LLM_MODEL = os.getenv("LLM_MODEL", "qwen2.5:1.5b").strip()
+EMBED_MODEL = os.getenv("EMBED_MODEL", "nomic-embed-text").strip()
