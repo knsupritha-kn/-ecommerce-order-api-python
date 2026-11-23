@@ -3,8 +3,9 @@ from bson import ObjectId
 from bson.errors import InvalidId
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 
+from app import config
 from app.ai import llm
-from app.ai.embeddings import VECTOR_INDEX, cosine, embed_product
+from app.ai.embeddings import QUERY_PREFIX, VECTOR_INDEX, cosine, embed_product
 from app.auth.dependencies import get_current_admin
 from app.database import db
 from app.models.product import ProductCreate, ProductOut
@@ -65,32 +66,37 @@ async def list_products(
 async def search_products(q: str = Query(min_length=1), limit: int = Query(5, ge=1, le=50)):
     """Semantic product search: Atlas $vectorSearch, falling back to in-Python cosine."""
     try:
-        query_vector = await llm.embed(q)
+        query_vector = await llm.embed(QUERY_PREFIX + q)
     except llm.AIUnavailableError:
         raise HTTPException(status_code=503, detail="AI service unavailable")
 
-    try:
-        pipeline = [
-            {
-                "$vectorSearch": {
-                    "index": VECTOR_INDEX,
-                    "path": "embedding",
-                    "queryVector": query_vector,
-                    "numCandidates": max(limit * 20, 100),
-                    "limit": limit,
-                }
-            },
-            {"$project": {"embedding": 0}},
-        ]
-        results = await db.products.aggregate(pipeline).to_list(length=limit)
-    except Exception:  # noqa: BLE001 - no Atlas index, non-Atlas MongoDB, or mongomock
+    results: list[dict] = []
+    if config.USE_ATLAS_VECTOR_SEARCH:
+        try:
+            pipeline = [
+                {
+                    "$vectorSearch": {
+                        "index": VECTOR_INDEX,
+                        "path": "embedding",
+                        "queryVector": query_vector,
+                        "numCandidates": max(limit * 20, 100),
+                        "limit": limit,
+                    }
+                },
+                {"$project": {"embedding": 0}},
+            ]
+            results = await db.products.aggregate(pipeline).to_list(length=limit)
+        except Exception:  # noqa: BLE001 - missing index / non-Atlas MongoDB
+            results = []
+
+    if not results:  # Atlas disabled, errored, or silently returned nothing (e.g. no index)
         docs = await db.products.find({"embedding": {"$exists": True}}).to_list(length=None)
         scored = sorted(
             ((cosine(query_vector, d["embedding"]), d) for d in docs),
             key=lambda pair: pair[0],
             reverse=True,
         )
-        results = [d for _, d in scored[:limit]]
+        results = [d for _, d in scored[:limit]]  # no similarity cutoff: always top-N by score
     return [product_to_out(p) for p in results]
 
 

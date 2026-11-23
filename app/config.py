@@ -20,3 +20,6 @@ def require_env(name: str) -> str:
 OLLAMA_BASE_URL = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434").strip().rstrip("/")
 LLM_MODEL = os.getenv("LLM_MODEL", "qwen2.5:1.5b").strip()
 EMBED_MODEL = os.getenv("EMBED_MODEL", "nomic-embed-text").strip()
+
+# Set true only if an Atlas Vector Search index named "product_vector_index" exists.
+USE_ATLAS_VECTOR_SEARCH = os.getenv("USE_ATLAS_VECTOR_SEARCH", "false").strip().lower() in ("1", "true", "yes", "on")

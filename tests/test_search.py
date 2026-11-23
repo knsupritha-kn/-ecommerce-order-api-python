@@ -114,3 +114,43 @@ async def test_search_validation_and_503(client, ai_down):
 async def test_search_route_not_shadowed_by_product_id(client, fake_embed):
     r = await client.get("/products/search", params={"q": "shoe"})
     assert r.status_code == 200
+
+
+async def test_empty_vector_search_falls_back_to_cosine(client, db, make_user, fake_embed, monkeypatch):
+    from app import config
+    from app.routes import products
+
+    _, headers = await make_user(admin=True)
+    for name in ["Trail shoe", "Gaming laptop"]:
+        await client.post("/products", json=product_body(name), headers=headers)
+
+    calls = []
+
+    class EmptyCursor:
+        async def to_list(self, length=None):
+            return []
+
+    class ProductsProxy:
+        def __init__(self, real):
+            self._real = real
+
+        def aggregate(self, pipeline):
+            calls.append(pipeline)
+            return EmptyCursor()
+
+        def __getattr__(self, name):
+            return getattr(self._real, name)
+
+    class DbProxy:
+        products = ProductsProxy(db.products)
+
+        def __getattr__(self, name):
+            return getattr(db, name)
+
+    monkeypatch.setattr(config, "USE_ATLAS_VECTOR_SEARCH", True)
+    monkeypatch.setattr(products, "db", DbProxy())
+    r = await client.get("/products/search", params={"q": "laptop", "limit": 2})
+    assert calls, "$vectorSearch should have been tried"
+    assert r.status_code == 200
+    assert r.json()[0]["name"] == "Gaming laptop"
+    assert len(r.json()) == 2
