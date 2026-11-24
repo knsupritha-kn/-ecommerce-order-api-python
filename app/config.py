@@ -23,3 +23,6 @@ EMBED_MODEL = os.getenv("EMBED_MODEL", "nomic-embed-text").strip()
 
 # Set true only if an Atlas Vector Search index named "product_vector_index" exists.
 USE_ATLAS_VECTOR_SEARCH = os.getenv("USE_ATLAS_VECTOR_SEARCH", "false").strip().lower() in ("1", "true", "yes", "on")
+
+# Semantic search: drop results whose cosine similarity is below this (range -1..1).
+SEARCH_MIN_SCORE = float(os.getenv("SEARCH_MIN_SCORE", "0.5"))

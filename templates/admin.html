@@ -322,7 +322,7 @@
             <td>${o.items.length}</td>
             <td>$${o.total.toFixed(2)}</td>
             <td><span class="badge ${statusBadgeClass(o.status)}">${o.status}</span></td>
-            <td>${new Date(o.created_at).toLocaleString()}</td>
+            <td>${formatDateTime(o.created_at)}</td>
             <td>
               <select class="form-select form-select-sm status-select" data-order-id="${o.id}" style="width: auto; display: inline-block;">
                 ${ORDER_STATUSES.map((s) => `<option value="${s}" ${s === o.status ? "selected" : ""}>${s}</option>`).join("")}

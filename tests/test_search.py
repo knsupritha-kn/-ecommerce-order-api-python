@@ -92,9 +92,32 @@ async def test_search_ranks_by_similarity_and_hides_embedding(client, db, make_u
     r = await client.get("/products/search", params={"q": "laptop", "limit": 2})
     assert r.status_code == 200
     body = r.json()
-    assert len(body) == 2
+    assert len(body) == 1  # the unrelated products fall below SEARCH_MIN_SCORE
     assert body[0]["name"] == "Gaming laptop"
     assert all("embedding" not in p for p in body)
+
+
+async def test_search_min_score_filters_and_logs(client, make_user, fake_embed, monkeypatch, caplog):
+    import logging
+
+    from app import config
+
+    _, headers = await make_user(admin=True)
+    for name in ["Trail shoe", "Gaming laptop"]:
+        await client.post("/products", json=product_body(name), headers=headers)
+
+    monkeypatch.setattr(config, "SEARCH_MIN_SCORE", -1.0)  # everything passes
+    r = await client.get("/products/search", params={"q": "laptop"})
+    assert len(r.json()) == 2
+
+    monkeypatch.setattr(config, "SEARCH_MIN_SCORE", 0.5)
+    with caplog.at_level(logging.DEBUG, logger="app.routes.products"):
+        r = await client.get("/products/search", params={"q": "laptop"})
+    assert [p["name"] for p in r.json()] == ["Gaming laptop"]
+    assert "score=" in caplog.text and "drop" in caplog.text
+
+    r = await client.get("/products/search", params={"q": "zzz"})  # matches nothing
+    assert r.json() == []
 
 
 async def test_search_skips_products_without_embedding(client, make_product, fake_embed):
@@ -152,5 +175,4 @@ async def test_empty_vector_search_falls_back_to_cosine(client, db, make_user, f
     r = await client.get("/products/search", params={"q": "laptop", "limit": 2})
     assert calls, "$vectorSearch should have been tried"
     assert r.status_code == 200
-    assert r.json()[0]["name"] == "Gaming laptop"
-    assert len(r.json()) == 2
+    assert [p["name"] for p in r.json()] == ["Gaming laptop"]

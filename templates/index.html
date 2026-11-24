@@ -34,27 +34,50 @@
     </form>
     <div id="alert-container"></div>
     <div id="products-container" class="row g-4"></div>
+    <div class="text-center my-4">
+      <button id="load-more" class="btn btn-outline-primary d-none" type="button">Load more</button>
+    </div>
   </div>
 
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
   <script src="/static/js/api.js"></script>
   <script>
-    async function loadProducts(query) {
+    const PAGE_SIZE = 8;
+    let skip = 0;
+
+    function bindAddToCart() {
+      document.querySelectorAll(".add-to-cart-btn:not([data-bound])").forEach((btn) => {
+        btn.dataset.bound = "1";
+        btn.addEventListener("click", () => addToCart(btn.dataset.productId));
+      });
+    }
+
+    // Loads the normal list (append=true fetches the next page) or search results.
+    async function loadProducts(query, append = false) {
       const container = document.getElementById("products-container");
+      const moreBtn = document.getElementById("load-more");
+      moreBtn.classList.add("d-none");
+      if (!append) skip = 0;
       try {
-        const path = query ? `/products/search?q=${encodeURIComponent(query)}&limit=5` : "/products?limit=100";
+        const path = query
+          ? `/products/search?q=${encodeURIComponent(query)}&limit=5`
+          : `/products?skip=${skip}&limit=${PAGE_SIZE}`;
         const products = await apiFetch(path);
-        if (!products.length) {
-          container.innerHTML = `<p class="text-muted">${query ? "No matching products." : "No products available."}</p>`;
+        if (!append && !products.length) {
+          container.innerHTML = `<p class="text-muted">${query ? "No matching products" : "No products available."}</p>`;
           return;
         }
-        container.innerHTML = products.map(renderProductCard).join("");
+        const html = products.map(renderProductCard).join("");
+        if (append) container.insertAdjacentHTML("beforeend", html);
+        else container.innerHTML = html;
+        bindAddToCart();
 
-        document.querySelectorAll(".add-to-cart-btn").forEach((btn) => {
-          btn.addEventListener("click", () => addToCart(btn.dataset.productId));
-        });
+        if (!query) {
+          skip += products.length;
+          if (products.length >= PAGE_SIZE) moreBtn.classList.remove("d-none");
+        }
       } catch (err) {
-        container.innerHTML = "";
+        if (!append) container.innerHTML = "";
         showAlert("alert-container", `${query ? "Search failed" : "Failed to load products"}: ${err.message}`);
       }
     }
@@ -102,6 +125,8 @@
       document.getElementById("search-input").value = "";
       loadProducts();
     });
+
+    document.getElementById("load-more").addEventListener("click", () => loadProducts(undefined, true));
 
     loadProducts();
   </script>

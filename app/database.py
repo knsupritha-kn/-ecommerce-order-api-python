@@ -6,7 +6,9 @@ from app.config import require_env
 MONGO_URI = require_env("MONGO_URI")
 
 # Create a single async MongoDB client for the app to reuse
-client = AsyncIOMotorClient(MONGO_URI)
+# tz_aware=True so datetimes read back are UTC-aware and serialize with a
+# timezone offset; otherwise the browser can't tell they are UTC.
+client = AsyncIOMotorClient(MONGO_URI, tz_aware=True)
 
 # Expose the database instance for use across the app (e.g. app.database.db)
 # The Atlas URI has no database name in its path, so name it explicitly.

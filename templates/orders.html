@@ -82,7 +82,7 @@
           <div class="card-body">
             <div class="d-flex justify-content-between align-items-start mb-2">
               <div>
-                <h5 class="card-title mb-1">Order placed on ${new Date(order.created_at).toLocaleString()} &mdash; Status: ${order.status}</h5>
+                <h5 class="card-title mb-1">Order placed on ${formatDateTime(order.created_at)} &mdash; Status: ${order.status}</h5>
               </div>
               <span class="badge ${statusBadgeClass(order.status)}">${order.status}</span>
             </div>

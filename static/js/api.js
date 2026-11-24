@@ -72,6 +72,15 @@ async function apiFetch(path, options = {}) {
     headers,
   });
 
+  if (response.status === 401 && token) {
+    // Expired/invalid session (only if we sent a token, so bad-login errors still show): clear it and send the user to log in.
+    clearToken();
+    clearRole();
+    clearName();
+    window.location.href = "login.html";
+    throw new Error("Session expired. Please log in again.");
+  }
+
   if (!response.ok) {
     let detail = `Request failed (${response.status})`;
     try {
@@ -90,6 +99,14 @@ async function apiFetch(path, options = {}) {
   }
 
   return response.json();
+}
+
+// The API returns datetimes without timezone info (they are UTC). Parse them
+// as UTC so toLocaleString() shows the viewer's local time.
+function formatDateTime(value) {
+  if (!value) return "";
+  const hasZone = /(Z|[+-]\d{2}:?\d{2})$/i.test(value);
+  return new Date(hasZone ? value : value + "Z").toLocaleString();
 }
 
 // Renders the navbar auth links based on login state.
