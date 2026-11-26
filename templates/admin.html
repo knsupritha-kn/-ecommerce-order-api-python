@@ -120,7 +120,7 @@
   </div>
 
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
-  <script src="/static/js/api.js"></script>
+  <script src="/static/js/api.js?v=2"></script>
   <script>
     if (!isAdmin()) {
       window.location.href = "index.html";
@@ -147,7 +147,7 @@
         return;
       }
       generateBtn.disabled = true;
-      generateBtn.textContent = "Generating...";
+      generateBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span>Generating...';
       try {
         const data = await apiFetch("/ai/products/describe", {
           method: "POST",

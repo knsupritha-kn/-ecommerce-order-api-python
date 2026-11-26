@@ -4,6 +4,8 @@ import os
 # time. Assigned (not setdefault) so a real .env can never leak into tests.
 os.environ["SECRET_KEY"] = "test-secret-key"
 os.environ["MONGO_URI"] = "mongodb://localhost:27017"
+os.environ["LLM_PROVIDER"] = "ollama"
+os.environ["GEMINI_API_KEY"] = ""
 
 import httpx
 import pytest

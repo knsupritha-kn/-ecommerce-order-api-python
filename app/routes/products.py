@@ -7,7 +7,13 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 
 from app import config
 from app.ai import llm
-from app.ai.embeddings import QUERY_PREFIX, VECTOR_INDEX, cosine, embed_product
+from app.ai.embeddings import (
+    VECTOR_INDEX,
+    cosine,
+    embed_product,
+    embedding_field,
+    query_text,
+)
 from app.auth.dependencies import get_current_admin
 from app.database import db
 from app.models.product import ProductCreate, ProductOut
@@ -69,10 +75,11 @@ async def list_products(
 async def search_products(q: str = Query(min_length=1), limit: int = Query(5, ge=1, le=50)):
     """Semantic product search: Atlas $vectorSearch, falling back to in-Python cosine."""
     try:
-        query_vector = await llm.embed(QUERY_PREFIX + q)
+        query_vector = await llm.embed(query_text(q))
     except llm.AIUnavailableError:
         raise HTTPException(status_code=503, detail="AI service unavailable")
 
+    field = embedding_field()
     results: list[dict] = []
     if config.USE_ATLAS_VECTOR_SEARCH:
         try:
@@ -80,14 +87,14 @@ async def search_products(q: str = Query(min_length=1), limit: int = Query(5, ge
                 {
                     "$vectorSearch": {
                         "index": VECTOR_INDEX,
-                        "path": "embedding",
+                        "path": field,
                         "queryVector": query_vector,
                         "numCandidates": max(limit * 20, 100),
                         "limit": limit,
                     }
                 },
                 {"$addFields": {"_score": {"$meta": "vectorSearchScore"}}},
-                {"$project": {"embedding": 0}},
+                {"$project": {"embedding": 0, "embedding_ollama": 0, "embedding_gemini": 0}},
             ]
             results = await db.products.aggregate(pipeline).to_list(length=limit)
             # Atlas cosine scores are (1 + cos) / 2; convert back to plain cosine.
@@ -97,9 +104,9 @@ async def search_products(q: str = Query(min_length=1), limit: int = Query(5, ge
             scored = []
 
     if not results:  # Atlas disabled, errored, or silently returned nothing (e.g. no index)
-        docs = await db.products.find({"embedding": {"$exists": True}}).to_list(length=None)
+        docs = await db.products.find({field: {"$exists": True}}).to_list(length=None)
         scored = sorted(
-            ((cosine(query_vector, d["embedding"]), d) for d in docs),
+            ((cosine(query_vector, d[field]), d) for d in docs),
             key=lambda pair: pair[0],
             reverse=True,
         )
@@ -127,7 +134,7 @@ async def create_product(product: ProductCreate, admin: dict = Depends(get_curre
     doc = product.model_dump()
     embedding = await embed_product(doc)
     if embedding is not None:
-        doc["embedding"] = embedding
+        doc[embedding_field()] = embedding
     result = await db.products.insert_one(doc)
     created = await db.products.find_one({"_id": result.inserted_id})
     return product_to_out(created)
@@ -144,9 +151,9 @@ async def update_product(
     embedding = await embed_product(fields)
     update = {"$set": fields}
     if embedding is not None:
-        fields["embedding"] = embedding
+        fields[embedding_field()] = embedding
     else:
-        update["$unset"] = {"embedding": ""}  # stale vector no longer matches the text
+        update["$unset"] = {embedding_field(): ""}  # stale vector no longer matches the text
     await db.products.update_one({"_id": ObjectId(product_id)}, update)
     updated = await db.products.find_one({"_id": ObjectId(product_id)})
     return product_to_out(updated)
