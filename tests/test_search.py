@@ -1,5 +1,6 @@
 import pytest
 
+from app import config
 from app.ai import llm
 
 KEYWORDS = ["shoe", "laptop", "book"]
@@ -34,31 +35,31 @@ async def test_create_product_stores_embedding_but_hides_it(client, db, make_use
     _, headers = await make_user(admin=True)
     r = await client.post("/products", json=product_body("Running shoe", "a shoe", "sport"), headers=headers)
     assert r.status_code == 201
-    assert "embedding" not in r.json()
+    assert "embedding_ollama" not in r.json()
     stored = await db.products.find_one({"name": "Running shoe"})
-    assert stored["embedding"] == fake_vector("Running shoe a shoe sport")
+    assert stored["embedding_ollama"] == fake_vector("Running shoe a shoe sport")
 
 
 async def test_create_product_without_ai_still_saves(client, db, make_user, ai_down):
     _, headers = await make_user(admin=True)
     r = await client.post("/products", json=product_body("Plain"), headers=headers)
     assert r.status_code == 201
-    assert "embedding" not in await db.products.find_one({"name": "Plain"})
+    assert "embedding_ollama" not in await db.products.find_one({"name": "Plain"})
 
 
 async def test_update_refreshes_and_clears_stale_embedding(client, db, make_user, fake_embed, monkeypatch):
     _, headers = await make_user(admin=True)
     pid = (await client.post("/products", json=product_body("shoe"), headers=headers)).json()["id"]
     r = await client.put(f"/products/{pid}", json=product_body("laptop"), headers=headers)
-    assert r.status_code == 200 and "embedding" not in r.json()
-    assert (await db.products.find_one({"name": "laptop"}))["embedding"][1] == 1.0
+    assert r.status_code == 200 and "embedding_ollama" not in r.json()
+    assert (await db.products.find_one({"name": "laptop"}))["embedding_ollama"][1] == 1.0
 
     async def down(text):
         raise llm.AIUnavailableError("down")
 
     monkeypatch.setattr(llm, "embed", down)
     await client.put(f"/products/{pid}", json=product_body("book"), headers=headers)
-    assert "embedding" not in await db.products.find_one({"name": "book"})
+    assert "embedding_ollama" not in await db.products.find_one({"name": "book"})
 
 
 async def test_reindex_admin_only(client, make_user, fake_embed):
@@ -74,7 +75,7 @@ async def test_reindex_embeds_existing_products(client, db, make_user, make_prod
     r = await client.post("/ai/products/reindex", headers=headers)
     assert r.status_code == 200
     assert r.json() == {"indexed": 2, "failed": 0}
-    assert await db.products.count_documents({"embedding": {"$exists": True}}) == 2
+    assert await db.products.count_documents({"embedding_ollama": {"$exists": True}}) == 2
 
 
 async def test_reindex_503_when_ai_down(client, make_user, make_product, ai_down):
@@ -94,13 +95,12 @@ async def test_search_ranks_by_similarity_and_hides_embedding(client, db, make_u
     body = r.json()
     assert len(body) == 1  # the unrelated products fall below SEARCH_MIN_SCORE
     assert body[0]["name"] == "Gaming laptop"
-    assert all("embedding" not in p for p in body)
+    assert all("embedding_ollama" not in p for p in body)
 
 
 async def test_search_min_score_filters_and_logs(client, make_user, fake_embed, monkeypatch, caplog):
     import logging
 
-    from app import config
 
     _, headers = await make_user(admin=True)
     for name in ["Trail shoe", "Gaming laptop"]:
@@ -140,7 +140,6 @@ async def test_search_route_not_shadowed_by_product_id(client, fake_embed):
 
 
 async def test_empty_vector_search_falls_back_to_cosine(client, db, make_user, fake_embed, monkeypatch):
-    from app import config
     from app.routes import products
 
     _, headers = await make_user(admin=True)
@@ -176,3 +175,23 @@ async def test_empty_vector_search_falls_back_to_cosine(client, db, make_user, f
     assert calls, "$vectorSearch should have been tried"
     assert r.status_code == 200
     assert [p["name"] for p in r.json()] == ["Gaming laptop"]
+
+
+async def test_embeddings_are_provider_specific(client, db, make_user, fake_embed, monkeypatch):
+    _, headers = await make_user(admin=True)
+    await client.post("/products", json=product_body("laptop"), headers=headers)  # ollama
+    monkeypatch.setattr(config, "LLM_PROVIDER", "gemini")
+    await client.post("/products", json=product_body("laptop pro"), headers=headers)
+    assert "embedding_ollama" in await db.products.find_one({"name": "laptop"})
+    assert "embedding_gemini" not in await db.products.find_one({"name": "laptop"})
+    pro = await db.products.find_one({"name": "laptop pro"})
+    assert "embedding_gemini" in pro and "embedding_ollama" not in pro
+
+    # Gemini search only sees gemini-embedded products; reindex fills only the active field.
+    monkeypatch.setattr(config, "SEARCH_MIN_SCORE", -1.0)
+    names = [p["name"] for p in (await client.get("/products/search", params={"q": "laptop"})).json()]
+    assert names == ["laptop pro"]
+    r = await client.post("/ai/products/reindex", headers=headers)
+    assert r.json()["indexed"] == 2
+    old = await db.products.find_one({"name": "laptop"})
+    assert "embedding_gemini" in old and "embedding_ollama" in old

@@ -6,7 +6,7 @@ from pydantic import BaseModel, Field
 
 from app import config
 from app.ai import llm
-from app.ai.embeddings import embed_product
+from app.ai.embeddings import embed_product, embedding_field
 from app.auth.dependencies import get_current_admin, get_current_user
 from app.database import db
 from app.ratelimit import ai_rate_limit
@@ -18,7 +18,9 @@ RECENT_ORDERS = 5
 
 SYSTEM_PROMPT = (
     "You are a helpful shop assistant. Answer only from the order data below. "
-    "Be brief. If the answer isn't in the data, say so.\n\n"
+    "Be brief. If the answer isn't in the data, say so. "
+    "Reply in plain text only: no markdown, no ** or bullet symbols. "
+    "Never show raw order IDs; refer to orders by their date and items instead.\n\n"
     "Order data:\n{context}"
 )
 
@@ -63,15 +65,25 @@ def _has_model(installed: list[str], wanted: str) -> bool:
 
 @router.get("/health")
 async def ai_health():
-    """Report Ollama reachability and whether both configured models are installed.
+    """Report the active provider and whether its models are usable.
 
-    Always 200: this is a status report, not an AI call.
+    Always 200: this is a status report, not an AI call (Gemini is not pinged).
     """
+    if config.LLM_PROVIDER == "gemini":
+        return {
+            "provider": "gemini",
+            "configured": bool(config.GEMINI_API_KEY),
+            "llm_model": {"name": config.GEMINI_CHAT_MODEL},
+            "embed_model": {"name": config.GEMINI_EMBED_MODEL},
+            "embedding_field": embedding_field(),
+        }
     try:
         installed = await llm.list_models()
     except llm.AIUnavailableError:
         installed = None
     return {
+        "provider": "ollama",
+        "embedding_field": embedding_field(),
         "ollama": installed is not None,
         "llm_model": {
             "name": config.LLM_MODEL,
@@ -96,7 +108,7 @@ async def reindex_products(admin: dict = Depends(get_current_admin)):
             if failed == 1 and indexed == 0:
                 raise ai_unavailable()  # Ollama is down; don't grind through every product
             continue
-        await db.products.update_one({"_id": product["_id"]}, {"$set": {"embedding": embedding}})
+        await db.products.update_one({"_id": product["_id"]}, {"$set": {embedding_field(): embedding}})
         indexed += 1
     return {"indexed": indexed, "failed": failed}
 
