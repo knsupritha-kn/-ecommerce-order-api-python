@@ -32,6 +32,18 @@
     <div id="orders-container">
       <p class="text-muted">Loading orders...</p>
     </div>
+
+    <div class="card mt-4 mb-5">
+      <div class="card-header">Ask about your orders</div>
+      <div class="card-body">
+        <div id="chat-log" class="mb-3"></div>
+        <form id="chat-form" class="input-group">
+          <input type="text" id="chat-input" class="form-control" maxlength="500" required
+                 placeholder="e.g. Where is my latest order?">
+          <button class="btn btn-primary" type="submit" id="chat-send">Ask</button>
+        </form>
+      </div>
+    </div>
   </div>
 
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
@@ -41,7 +53,7 @@
 
     async function loadProducts() {
       try {
-        const products = await apiFetch("/products");
+        const products = await apiFetch("/products?limit=100");
         productMap = Object.fromEntries(products.map((p) => [p.id, p.name]));
       } catch (err) {
         productMap = {};
@@ -70,7 +82,7 @@
           <div class="card-body">
             <div class="d-flex justify-content-between align-items-start mb-2">
               <div>
-                <h5 class="card-title mb-1">Order placed on ${new Date(order.created_at).toLocaleString()} &mdash; Status: ${order.status}</h5>
+                <h5 class="card-title mb-1">Order placed on ${formatDateTime(order.created_at)} &mdash; Status: ${order.status}</h5>
               </div>
               <span class="badge ${statusBadgeClass(order.status)}">${order.status}</span>
             </div>
@@ -99,13 +111,44 @@
       const container = document.getElementById("orders-container");
       try {
         await loadProducts();
-        const orders = await apiFetch("/orders");
+        const orders = await apiFetch("/orders?limit=100");
         renderOrders(orders);
       } catch (err) {
         container.innerHTML = "";
         showAlert("alert-container", `Failed to load orders: ${err.message}`);
       }
     }
+
+    function addChatLine(who, text) {
+      const p = document.createElement("p");
+      p.className = "mb-2";
+      const b = document.createElement("strong");
+      b.textContent = who + ": ";
+      p.append(b, document.createTextNode(text));
+      document.getElementById("chat-log").appendChild(p);
+    }
+
+    document.getElementById("chat-form").addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const input = document.getElementById("chat-input");
+      const send = document.getElementById("chat-send");
+      const message = input.value.trim();
+      if (!message) return;
+      addChatLine("You", message);
+      input.value = "";
+      send.disabled = true;
+      try {
+        const data = await apiFetch("/ai/chat", {
+          method: "POST",
+          body: JSON.stringify({ message }),
+        });
+        addChatLine("Assistant", data.reply);
+      } catch (err) {
+        addChatLine("Assistant", `Sorry, ${err.message}`);
+      } finally {
+        send.disabled = false;
+      }
+    });
 
     loadOrders();
   </script>

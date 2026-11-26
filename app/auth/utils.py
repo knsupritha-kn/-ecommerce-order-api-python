@@ -1,13 +1,13 @@
 import os
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 import bcrypt
-from dotenv import load_dotenv
 from jose import JWTError, jwt
 
-load_dotenv()
+from app.config import require_env
 
-SECRET_KEY = os.getenv("SECRET_KEY")
+# Raises a clear error at startup if SECRET_KEY is not set
+SECRET_KEY = require_env("SECRET_KEY")
 ALGORITHM = os.getenv("ALGORITHM", "HS256")
 ACCESS_TOKEN_EXPIRE_MINUTES = 60
 
@@ -25,7 +25,7 @@ def verify_password(plain_password: str, hashed_password: str) -> bool:
 def create_access_token(data: dict, expires_delta: timedelta | None = None) -> str:
     """Create a signed JWT access token embedding the given claims."""
     to_encode = data.copy()
-    expire = datetime.now(timezone.utc) + (
+    expire = datetime.now(UTC) + (
         expires_delta or timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
     )
     to_encode.update({"exp": expire})

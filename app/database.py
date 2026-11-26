@@ -1,15 +1,14 @@
-import os
-
-from dotenv import load_dotenv
 from motor.motor_asyncio import AsyncIOMotorClient
 
-# Load environment variables from a .env file into the process environment
-load_dotenv()
+from app.config import require_env
 
-MONGO_URI = os.getenv("MONGO_URI")
+# Raises a clear error at startup if MONGO_URI is not set
+MONGO_URI = require_env("MONGO_URI")
 
 # Create a single async MongoDB client for the app to reuse
-client = AsyncIOMotorClient(MONGO_URI)
+# tz_aware=True so datetimes read back are UTC-aware and serialize with a
+# timezone offset; otherwise the browser can't tell they are UTC.
+client = AsyncIOMotorClient(MONGO_URI, tz_aware=True)
 
 # Expose the database instance for use across the app (e.g. app.database.db)
 # The Atlas URI has no database name in its path, so name it explicitly.
@@ -22,6 +21,6 @@ async def test_connection() -> bool:
         await client.admin.command("ping")
         print("MongoDB connection successful.")
         return True
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001 - any failure means "not connected"
         print(f"MongoDB connection failed: {exc}")
         return False

@@ -1,4 +1,5 @@
-from datetime import datetime, timezone
+import logging
+from datetime import UTC, datetime
 
 from bson import ObjectId
 from bson.errors import InvalidId
@@ -8,8 +9,10 @@ from app.auth.dependencies import get_current_admin, get_current_user
 from app.database import db
 from app.models.cart import CartItem
 from app.models.order import OrderCreate, OrderOut, OrderStatusUpdate
+from app.pagination import Pagination, pagination
 
 router = APIRouter(prefix="/orders", tags=["orders"])
+logger = logging.getLogger(__name__)
 
 
 def order_to_out(order: dict) -> OrderOut:
@@ -25,17 +28,33 @@ def order_to_out(order: dict) -> OrderOut:
 
 
 @router.get("", response_model=list[OrderOut])
-async def list_orders(current_user: dict = Depends(get_current_user)):
-    """List the logged-in user's order history, most recent first."""
+async def list_orders(
+    current_user: dict = Depends(get_current_user), page: Pagination = Depends(pagination)
+):
+    """List the logged-in user's order history (paginated), most recent first."""
     user_id = str(current_user["_id"])
-    orders = await db.orders.find({"user_id": user_id}).sort("created_at", -1).to_list(length=None)
+    orders = (
+        await db.orders.find({"user_id": user_id})
+        .sort("created_at", -1)
+        .skip(page.skip)
+        .limit(page.limit)
+        .to_list(length=None)
+    )
     return [order_to_out(o) for o in orders]
 
 
 @router.get("/admin/all", response_model=list[OrderOut])
-async def list_all_orders(admin: dict = Depends(get_current_admin)):
-    """List every order from every user (admin only)."""
-    orders = await db.orders.find().sort("created_at", -1).to_list(length=None)
+async def list_all_orders(
+    admin: dict = Depends(get_current_admin), page: Pagination = Depends(pagination)
+):
+    """List every order from every user (admin only, paginated)."""
+    orders = (
+        await db.orders.find()
+        .sort("created_at", -1)
+        .skip(page.skip)
+        .limit(page.limit)
+        .to_list(length=None)
+    )
     return [order_to_out(o) for o in orders]
 
 
@@ -83,6 +102,7 @@ async def create_order(order: OrderCreate, current_user: dict = Depends(get_curr
 
     cart = await db.cart.find_one({"user_id": user_id})
     if cart is None or not cart.get("items"):
+        logger.info("order rejected: empty cart (user=%s)", user_id)
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Cart is empty")
 
     items = cart["items"]
@@ -91,11 +111,21 @@ async def create_order(order: OrderCreate, current_user: dict = Depends(get_curr
     for item in items:
         product = await db.products.find_one({"_id": ObjectId(item["product_id"])})
         if product is None:
+            logger.warning(
+                "order rejected: product %s no longer exists (user=%s)", item["product_id"], user_id
+            )
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail=f"Product {item['product_id']} no longer exists",
             )
         if item["quantity"] > product["stock"]:
+            logger.warning(
+                "order rejected: insufficient stock for product %s (wanted=%s, have=%s, user=%s)",
+                item["product_id"],
+                item["quantity"],
+                product["stock"],
+                user_id,
+            )
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail=f"Only {product['stock']} units of {product['name']} available in stock",
@@ -103,13 +133,29 @@ async def create_order(order: OrderCreate, current_user: dict = Depends(get_curr
         products[item["product_id"]] = product
         total += product["price"] * item["quantity"]
 
+    # Atomically reserve stock per item; the filter prevents overselling under concurrency.
+    reduced = []
     for item in items:
-        await db.products.update_one(
-            {"_id": ObjectId(item["product_id"])},
-            {"$inc": {"stock": -item["quantity"]}},
+        pid = ObjectId(item["product_id"])
+        qty = item["quantity"]
+        result = await db.products.update_one(
+            {"_id": pid, "stock": {"$gte": qty}},
+            {"$inc": {"stock": -qty}},
         )
+        if result.modified_count == 0:
+            logger.warning(
+                "order failed: stock race on product %s, rolling back %d item(s) (user=%s)",
+                item["product_id"],
+                len(reduced),
+                user_id,
+            )
+            # Roll back stock for items already reduced.
+            for done_pid, done_qty in reduced:
+                await db.products.update_one({"_id": done_pid}, {"$inc": {"stock": done_qty}})
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Not enough stock")
+        reduced.append((pid, qty))
 
-    created_at = datetime.now(timezone.utc)
+    created_at = datetime.now(UTC)
     order_doc = {
         "user_id": user_id,
         "items": items,
@@ -118,7 +164,16 @@ async def create_order(order: OrderCreate, current_user: dict = Depends(get_curr
         "shipping_address": order.shipping_address,
         "created_at": created_at,
     }
-    result = await db.orders.insert_one(order_doc)
+    try:
+        result = await db.orders.insert_one(order_doc)
+    except Exception:
+        logger.exception("order failed: could not save order after reserving stock (user=%s)", user_id)
+        for item in items:
+            await db.products.update_one(
+                {"_id": ObjectId(item["product_id"])}, {"$inc": {"stock": item["quantity"]}}
+            )
+        raise
+    logger.info("order placed: id=%s user=%s total=%.2f", result.inserted_id, user_id, total)
 
     await db.cart.delete_one({"user_id": user_id})
 

@@ -1,8 +1,9 @@
-fastapi
-uvicorn
-motor
-python-dotenv
-pydantic[email]
-python-jose
-bcrypt
-python-multipart
+fastapi==0.165.0
+uvicorn==0.54.0
+motor==3.7.1
+python-dotenv==1.2.4
+pydantic[email]==2.14.4
+python-jose==3.5.0
+bcrypt==5.0.0
+python-multipart==0.0.34
+httpx==0.28.1
