@@ -6,6 +6,7 @@ A full-stack e-commerce app built on **FastAPI + MongoDB Atlas**: a complete sho
 
 🔗 **Live Demo:** https://ecommerce-order-api-8u4j.onrender.com/login.html
 > ⏳ Hosted on Render's free tier, so the first load may take ~50 seconds.
+> 
 > 🤖 AI features work on the live demo using Google Gemini (free tier). Locally, the app can use Ollama instead (`LLM_PROVIDER=ollama`).
 
 ## Features
