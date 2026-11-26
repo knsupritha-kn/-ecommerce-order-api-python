@@ -2,11 +2,11 @@
 
 # E-commerce Order Management System
 
-A full-stack e-commerce app built on **FastAPI + MongoDB Atlas**: a complete shopping flow (catalog, cart, orders) with an admin dashboard, plus an optional **local-LLM AI layer** (via Ollama) that adds semantic product search (RAG), an order-support assistant, and AI-drafted product descriptions. The AI layer degrades gracefully: if Ollama isn't running, AI endpoints return `503` and the rest of the app works normally.
+A full-stack e-commerce app built on **FastAPI + MongoDB Atlas**: a complete shopping flow (catalog, cart, orders) with an admin dashboard, plus an **AI layer** (Google Gemini in the cloud, or local Ollama) that adds semantic product search (RAG), an order-support assistant, and AI-drafted product descriptions. The AI layer degrades gracefully: if the AI provider isn't reachable, AI endpoints return `503` and the rest of the app works normally.
 
 🔗 **Live Demo:** https://ecommerce-order-api-8u4j.onrender.com/login.html
 > ⏳ Hosted on Render's free tier, so the first load may take ~50 seconds.
-> 🤖 The hosted demo has no Ollama server, so the AI features show "AI service unavailable" there. Run locally (below) to try them.
+> 🤖 AI features work on the live demo using Google Gemini (free tier). Locally, the app can use Ollama instead (`LLM_PROVIDER=ollama`).
 
 ## Features
 
