@@ -188,3 +188,10 @@ docker run --env-file .env -p 8000:8000 ecommerce-order-api
 | Products | Orders |
 |---|---|
 | ![](Screenshots/admin-products.png) | ![](Screenshots/admin-orders.png) |
+
+### AI Features
+| Semantic Search | Order Assistant |
+|---|---|
+| ![](Screenshots/ai-search.png) | ![](Screenshots/ai-order-chat.png) |
+| **AI Product Description** | |
+| ![](Screenshots/ai-generate-description.png) | |
